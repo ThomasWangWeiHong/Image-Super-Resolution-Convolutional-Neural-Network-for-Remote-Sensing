@@ -26,7 +26,7 @@ def blurred_image_creation(img, n_factor):
     
     blurred_img = np.zeros((img.shape))
     for i in range(img.shape[2]):
-        blurred_img[:, :, i] = cv2.GaussianBlur(img[:, :, i], (3, 3), 0)
+        blurred_img[:, :, i] = cv2.GaussianBlur(img[:, :, i], (5, 5), 0)
     blurred_img_small = cv2.resize(blurred_img, (int(img.shape[1] / n_factor), int(img.shape[0] / n_factor)), 
                                    interpolation = cv2.INTER_AREA)
     blurred_img_sam = cv2.resize(blurred_img_small, (img.shape[1], img.shape[0]), interpolation = cv2.INTER_CUBIC)
@@ -36,7 +36,7 @@ def blurred_image_creation(img, n_factor):
 
 
 def image_clip_to_segment(image_array, blurred_image_array, image_height_size, image_width_size, mode, n_bands, 
-                         f1, f2, f3):
+                         f1, f2, f3, padding):
     """ 
     This function is used to cut up original input images of any size into segments of a fixed size, with empty clipped areas 
     padded with zeros to ensure that segments are of equal fixed sizes and contain valid data values. The function then 
@@ -53,6 +53,8 @@ def image_clip_to_segment(image_array, blurred_image_array, image_height_size, i
     - f1: size of kernel to be used for the first convolutional layer
     - f2: size of kernel to be used for the second convolutional layer
     - f3: size of kernel to be used for the last convolutional filter
+    - padding: String which determines whether the input image is padded during model training so as to maintain the original image 
+               size ('same') or to use the clipped version as implemented in the paper ('original')
     
     Output:
     - blurred_segment_array: 4 - Dimensional numpy array of Gaussian blurred image to serve as training data for SRCNN model
@@ -91,13 +93,19 @@ def image_clip_to_segment(image_array, blurred_image_array, image_height_size, i
     for i in range(0, image_array.shape[0], image_height_size):
         for j in range(0, image_array.shape[1], image_width_size):
             img_orig = img_complete[i : i + image_height_size, j : j + image_width_size, 0 : n_bands]
-            img_list.append(img_orig[start_index : (image_height_size - start_index), 
-                                     start_index : (image_width_size - start_index), 0 : n_bands])
+            if padding = 'original':
+                img_list.append(img_orig[start_index : (image_height_size - start_index), 
+                                         start_index : (image_width_size - start_index), 0 : n_bands])
+            else:
+                img_list.append(img_orig)
             blurred_list.append(blurred_complete[i : i + image_height_size, j : j + image_width_size, 0 : n_bands])
         
     reduction = f1 + f2 + f3 - 3
     
-    image_segment_array = np.zeros((len(img_list), image_height_size - reduction, image_width_size - reduction, n_bands))
+    if padding = 'original':
+        image_segment_array = np.zeros((len(img_list), image_height_size - reduction, image_width_size - reduction, n_bands))
+    else:
+        image_segment_array = np.zeros((len(img_list), image_height_size, image_width_size, n_bands))
     blurred_segment_array = np.zeros((len(blurred_list), image_height_size, image_width_size, n_bands))
 
     
@@ -109,7 +117,7 @@ def image_clip_to_segment(image_array, blurred_image_array, image_height_size, i
 
 
 
-def training_data_generation(DATA_DIR, img_height_size, img_width_size, f_1, f_2, f_3, factor):
+def training_data_generation(DATA_DIR, img_height_size, img_width_size, f_1, f_2, f_3, factor, pad):
     """ 
     This function is used to read in files from a folder which contains the images which are to be used for training the 
     SRCNN model, then returns 2 numpy arrays containing the training and target data for all the images in the folder so that
@@ -124,6 +132,8 @@ def training_data_generation(DATA_DIR, img_height_size, img_width_size, f_1, f_2
     - f_2: size of kernel to be used for the second convolutional layer
     - f_3: size of kernel to be used for the last convolutional filter
     - factor: The upscaling factor by which the SRCNN model should be trained to upscale
+    - pad: String which determines whether the input image is padded during model training so as to maintain the original image 
+           size ('same') or to use the clipped version as implemented in the paper ('original')
     
     Outputs:
     - blurred_full_array: 4 - Dimensional numpy array of Gaussian blurred images to serve as training data for SRCNN model
@@ -133,6 +143,9 @@ def training_data_generation(DATA_DIR, img_height_size, img_width_size, f_1, f_2
     
     if f_1 % 2 == 0 or f_2 % 2 == 0 or f_3 % 2 == 0:
         raise ValueError('Please input odd numbers for f1, f2 and f3.')
+        
+    if pad not in ['original', 'same']:
+        raise ValueError("Please input either 'original' or 'same' for pad.")
     
     img_files = glob.glob(DATA_DIR + '\\' + 'Train_*.tif')
     
@@ -145,16 +158,20 @@ def training_data_generation(DATA_DIR, img_height_size, img_width_size, f_1, f_2
     
         if (img.shape[0] % img_height_size != 0) and (img.shape[1] % img_width_size == 0):
             blurred_array, img_array = image_clip_to_segment(img, blurred_img, img_height_size, img_width_size, mode = 0, 
-                                                             n_bands = img.shape[2], f1 = f_1, f2 = f_2, f3 = f_3)
+                                                             n_bands = img.shape[2], f1 = f_1, f2 = f_2, f3 = f_3, 
+                                                             padding = pad)
         elif (img.shape[0] % img_height_size == 0) and (img.shape[1] % img_width_size != 0):
             blurred_array, img_array = image_clip_to_segment(img, blurred_img, img_height_size, img_width_size, mode = 1, 
-                                                             n_bands = img.shape[2], f1 = f_1, f2 = f_2, f3 = f_3)
+                                                             n_bands = img.shape[2], f1 = f_1, f2 = f_2, f3 = f_3, 
+                                                             padding = pad)
         elif (img.shape[0] % img_height_size != 0) and (img.shape[1] % img_width_size != 0):
             blurred_array, img_array = image_clip_to_segment(img, blurred_img, img_height_size, img_width_size, mode = 2, 
-                                                             n_bands = img.shape[2], f1 = f_1, f2 = f_2, f3 = f_3)
+                                                             n_bands = img.shape[2], f1 = f_1, f2 = f_2, f3 = f_3, 
+                                                             padding = pad)
         else:
             blurred_array, img_array = image_clip_to_segment(img, blurred_img, img_height_size, img_width_size, mode = 3, 
-                                                             n_bands = img.shape[2], f1 = f_1, f2 = f_2, f3 = f_3)
+                                                             n_bands = img.shape[2], f1 = f_1, f2 = f_2, f3 = f_3, 
+                                                             padding = pad)
         
         img_array_list.append(img_array)
         blurred_array_list.append(blurred_array)
@@ -168,7 +185,7 @@ def training_data_generation(DATA_DIR, img_height_size, img_width_size, f_1, f_2
 
 
 
-def srcnn_model(image_height_size, image_width_size, n_bands, n1 = 64, n2 = 32, f1 = 9, f2 = 1, f3 = 5, l_r = 0.00001):
+def srcnn_model(image_height_size, image_width_size, n_bands, n1 = 64, n2 = 32, f1 = 9, f2 = 1, f3 = 5, l_r = 0.00001, pad = 'same'):
     """ 
     This function creates the SRCNN model which needs to be trained, following the main architecture as described in the 
     paper 'Image Super - Resolution Using Deep Convolutional Networks'.
@@ -183,6 +200,8 @@ def srcnn_model(image_height_size, image_width_size, n_bands, n1 = 64, n2 = 32, 
     - f2: size of kernel to be used for the second convolutional layer
     - f3: size of kernel to be used for the last convolutional filter
     - l_r: Learning rate to be used by the Adam optimizer
+    - pad: String which determines whether the input image is padded during model training so as to maintain the original image 
+           size ('same') or to use the clipped version as implemented in the paper ('valid')
     
     Outputs:
     - model: SRCNN model compiled using the parameters defined in the input, and compiled with the Adam optimizer and 
@@ -190,10 +209,13 @@ def srcnn_model(image_height_size, image_width_size, n_bands, n1 = 64, n2 = 32, 
     
     """
     
+    if pad not in ['valid', 'same']:
+        raise ValueError("Please input either 'valid' or 'same' for pad.")
+    
     img_input = Input(shape = (image_height_size, image_width_size, n_bands))
-    conv1 = Conv2D(n1, (f1, f1), padding = 'valid', activation = 'relu')(img_input)
-    conv2 = Conv2D(n2, (f2, f2), padding = 'valid', activation = 'relu')(conv1)
-    conv3 = Conv2D(n_bands, (f3, f3), padding = 'valid')(conv2)
+    conv1 = Conv2D(n1, (f1, f1), padding = pad, activation = 'relu')(img_input)
+    conv2 = Conv2D(n2, (f2, f2), padding = pad, activation = 'relu')(conv1)
+    conv3 = Conv2D(n_bands, (f3, f3), padding = pad)(conv2)
     
     model = Model(inputs = img_input, outputs = conv3)
     model.compile(optimizer = Adam(lr = l_r), loss = 'mse', metrics = ['mse'])
