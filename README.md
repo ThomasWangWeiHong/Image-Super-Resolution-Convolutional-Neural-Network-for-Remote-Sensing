@@ -6,7 +6,8 @@ This script reproduces the Super Resolution Convolutional Neural Network (SRCNN)
 
 The main differences lie in the learning rate schedule and the loss optimizer used in the SRCNN model.
 In addition, this script also includes functions which are used to preprocess the input images into a proper format
-so that they can be used to train the SRCNN model.
+so that they can be used to train the SRCNN model, and functions which uses the model to create an upsampled version of
+a raster file, and write it to file.
 
 Requirements:
 - cv2
