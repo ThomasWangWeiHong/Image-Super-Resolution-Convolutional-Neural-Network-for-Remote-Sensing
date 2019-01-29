@@ -9,6 +9,9 @@ In addition, this script also includes functions which are used to preprocess th
 so that they can be used to train the SRCNN model, and functions which uses the model to create an upsampled version of
 a raster file, and write it to file.
 
+NOTE: gdal would be unable to write a very large array to file, so please do try to keep the input image file as small as possible.
+      (5000 x 5000 x 4 arrays can still be written to file)
+
 Requirements:
 - cv2
 - gc
