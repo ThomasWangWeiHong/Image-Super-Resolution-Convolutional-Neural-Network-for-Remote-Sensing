@@ -93,7 +93,7 @@ def image_clip_to_segment(image_array, blurred_image_array, image_height_size, i
     for i in range(0, image_array.shape[0], image_height_size):
         for j in range(0, image_array.shape[1], image_width_size):
             img_orig = img_complete[i : i + image_height_size, j : j + image_width_size, 0 : n_bands]
-            if padding = 'original':
+            if padding == 'original':
                 img_list.append(img_orig[start_index : (image_height_size - start_index), 
                                          start_index : (image_width_size - start_index), 0 : n_bands])
             else:
@@ -102,7 +102,7 @@ def image_clip_to_segment(image_array, blurred_image_array, image_height_size, i
         
     reduction = f1 + f2 + f3 - 3
     
-    if padding = 'original':
+    if padding == 'original':
         image_segment_array = np.zeros((len(img_list), image_height_size - reduction, image_width_size - reduction, n_bands))
     else:
         image_segment_array = np.zeros((len(img_list), image_height_size, image_width_size, n_bands))
