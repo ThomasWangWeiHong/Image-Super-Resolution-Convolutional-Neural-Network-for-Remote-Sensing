@@ -259,14 +259,14 @@ def image_model_predict(input_image_filename, img_height_size, img_width_size, n
     reduction = f1 + f2 + f3 - 3
     
     if (img.shape[0] % img_height_size != 0) and (img.shape[1] % img_width_size == 0):
-        img_complete = np.zeros((x_size, img.shape[1], n_bands))
-        img_complete[0 : img.shape[0], 0 : img.shape[1], 0 : n_bands] = img
+        img_complete = np.zeros((x_size, img.shape[1], img.shape[2]))
+        img_complete[0 : img.shape[0], 0 : img.shape[1], 0 : img.shape[2]] = img
     elif (img.shape[0] % img_height_size == 0) and (img.shape[1] % img_width_size != 0):
-        img_complete = np.zeros((img.shape[0], y_size, n_bands))
-        img_complete[0 : img.shape[0], 0 : img.shape[1], 0 : n_bands] = img
+        img_complete = np.zeros((img.shape[0], y_size, img.shape[2]))
+        img_complete[0 : img.shape[0], 0 : img.shape[1], 0 : img.shape[2]] = img
     elif (img.shape[0] % img_height_size != 0) and (img.shape[1] % img_width_size != 0):
-        img_complete = np.zeros((x_size, y_size, n_bands))
-        img_complete[0 : img.shape[0], 0 : img.shape[1], 0 : n_bands] = img
+        img_complete = np.zeros((x_size, y_size, img.shape[2]))
+        img_complete[0 : img.shape[0], 0 : img.shape[1], 0 : img.shape[2]] = img
     else:
          img_complete = img
     
@@ -275,13 +275,13 @@ def image_model_predict(input_image_filename, img_height_size, img_width_size, n
                              img_complete.shape[1] - (img_complete.shape[1] // img_width_size) * reduction, 
                              n_bands))
     else:
-        pred_img = np.zeros((img_complete.shape[0], img_complete.shape[1], n_bands))
-    img_holder = np.zeros((1, img_height_size, img_width_size, n_bands))
+        pred_img = np.zeros((img_complete.shape[0], img_complete.shape[1], img.shape[2]))
+    img_holder = np.zeros((1, img_height_size, img_width_size, img.shape[2]))
     preds_list = []
     
     for i in range(0, img_complete.shape[0], img_height_size):
         for j in range(0, img_complete.shape[1], img_width_size):
-            img_holder[0] = img_complete[i : i + img_height_size, j : j + img_width_size, 0 : n_bands]
+            img_holder[0] = img_complete[i : i + img_height_size, j : j + img_width_size, 0 : img.shape[2]]
             preds = fitted_model.predict(img_holder)
             preds_list.append(preds)
     
@@ -289,37 +289,45 @@ def image_model_predict(input_image_filename, img_height_size, img_width_size, n
     if pad == 'original':
         for i in range(0, pred_img.shape[0], img_height_size - reduction):
             for j in range(0, pred_img.shape[1], img_width_size - reduction):
-                pred_img[i : i + img_height_size - reduction, j : j + img_width_size - reduction, 0 : n_bands] = preds_list[n]
+                pred_img[i : i + img_height_size - reduction, j : j + img_width_size - reduction, 0 : img.shape[2]] = preds_list[n]
                 n += 1
     else:
         for i in range(0, pred_img.shape[0], img_height_size):
             for j in range(0, pred_img.shape[1], img_width_size):
-                pred_img[i : i + img_height_size, j : j + img_width_size, 0 : n_bands] = preds_list[n]
+                pred_img[i : i + img_height_size, j : j + img_width_size, 0 : img.shape[2]] = preds_list[n]
                 n += 1
+                
+    if pad == 'original':
+        pred_img_actual = pred_img[0 : img.shape[0] - (img.shape[0] // img_height_size) * reduction, 
+                                   0 : img.shape[1] - (img.shape[1] // img_width_size) * reduction, 
+                                   0 : img.shape[2]]
+    else:
+        pred_img_actual = pred_img[0 : img.shape[0], 0 : img.shape[1], 0 : img.shape[2]]
             
     if write:
         input_dataset = gdal.Open(input_image_filename)
         input_band = input_dataset.GetRasterBand(1)
         gtiff_driver = gdal.GetDriverByName('GTiff')
-        if pad == 'original':
-            output_dataset = gtiff_driver.Create(output_filename, 
-                                                 img_complete.shape[0] - (img_complete.shape[0] // img_height_size) * reduction, 
-                                                 img_complete.shape[1] - (img_complete.shape[1] // img_width_size) * reduction, 
-                                                 n_bands, gdal.GDT_Float32)
-        else:
-            output_dataset = gtiff_driver.Create(output_filename, img_complete.shape[0], img_complete.shape[1], n_bands, 
-                                                 gdal.GDT_Float32)
+        output_dataset = gtiff_driver.Create(output_filename, pred_img_actual.shape[1], pred_img_actual.shape[0], 
+                                             pred_img_actual.shape[2], gdal.GDT_Float32)
         output_dataset.SetProjection(input_dataset.GetProjection())
-        output_dataset.SetGeoTransform((input_dataset.GetGeoTransform()[0], 
-                                        input_dataset.GetGeoTransform()[1] * np.round((1 / factor), decimals = 1), 
-                                        input_dataset.GetGeoTransform()[2], input_dataset.GetGeoTransform()[3], 
-                                        input_dataset.GetGeoTransform()[4], 
-                                        input_dataset.GetGeoTransform()[5] * np.round((1 / factor), decimals = 1)))
+        if factor % 3 == 0:
+            output_dataset.SetGeoTransform((input_dataset.GetGeoTransform()[0], 
+                                            float(math.ceil(input_dataset.GetGeoTransform()[1] * np.round((1 / factor), decimals = 1))), 
+                                            input_dataset.GetGeoTransform()[2], input_dataset.GetGeoTransform()[3], 
+                                            input_dataset.GetGeoTransform()[4], 
+                                            float(- math.ceil(- input_dataset.GetGeoTransform()[5] * np.round((1 / factor), decimals = 1)))))
+        else:
+            output_dataset.SetGeoTransform((input_dataset.GetGeoTransform()[0], 
+                                            input_dataset.GetGeoTransform()[1] * np.round((1 / factor), decimals = 1), 
+                                            input_dataset.GetGeoTransform()[2], input_dataset.GetGeoTransform()[3], 
+                                            input_dataset.GetGeoTransform()[4], 
+                                            input_dataset.GetGeoTransform()[5] * np.round((1 / factor), decimals = 1)))
         for i in range(1, 5):
-            output_dataset.GetRasterBand(i).WriteArray(pred_img[:, :, i - 1])    
+            output_dataset.GetRasterBand(i).WriteArray(pred_img_actual[:, :, i - 1])    
         output_dataset.FlushCache()
         for i in range(1, 5):
             output_dataset.GetRasterBand(i).ComputeStatistics(False)
         del output_dataset
     
-    return pred_img
+    return pred_img_actual
