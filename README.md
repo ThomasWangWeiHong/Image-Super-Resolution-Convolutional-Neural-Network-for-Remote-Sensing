@@ -1,4 +1,4 @@
-# Image-Super-Resolution-Convolutional-Neural-Network
+# Image-Super-Resolution-Convolutional-Neural-Network-for-Remote-Sensing
 Python implementation of image super resolution convolutional neural network
 
 This script reproduces the Super Resolution Convolutional Neural Network (SRCNN) as described in the paper
