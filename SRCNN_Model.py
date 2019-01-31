@@ -35,8 +35,7 @@ def blurred_image_creation(img, n_factor):
 
 
 
-def image_clip_to_segment(image_array, blurred_image_array, image_height_size, image_width_size, mode, n_bands, 
-                         f1, f2, f3, padding):
+def image_clip_to_segment(image_array, blurred_image_array, image_height_size, image_width_size, mode, f1, f2, f3, padding):
     """ 
     This function is used to cut up original input images of any size into segments of a fixed size, with empty clipped areas 
     padded with zeros to ensure that segments are of equal fixed sizes and contain valid data values. The function then 
@@ -49,7 +48,6 @@ def image_clip_to_segment(image_array, blurred_image_array, image_height_size, i
     - image_height_size: Height of image to be fed into the SRCNN model for training
     - image_width_size: Width of image to be fed into the SRCNN model for training
     - mode: Integer representing the status of height and width of input image which is defined under 'image_array'
-    - n_bands: Number of channels contained in the input image
     - f1: size of kernel to be used for the first convolutional layer
     - f2: size of kernel to be used for the second convolutional layer
     - f3: size of kernel to be used for the last convolutional filter
@@ -63,24 +61,27 @@ def image_clip_to_segment(image_array, blurred_image_array, image_height_size, i
     
     """
     
-    x_size = ((image_array.shape[0] // image_height_size) + 1) * image_height_size
-    y_size = ((image_array.shape[1] // image_width_size) + 1) * image_width_size
+    y_size = ((image_array.shape[0] // image_height_size) + 1) * image_height_size
+    x_size = ((image_array.shape[1] // image_width_size) + 1) * image_width_size
     
     if mode == 0:
-        img_complete = np.zeros((x_size, image_array.shape[1], n_bands))
-        blurred_complete = np.zeros((x_size, image_array.shape[1], n_bands))
-        img_complete[0 : image_array.shape[0], 0 : image_array.shape[1], 0 : n_bands] = image_array
-        blurred_complete[0 : blurred_image_array.shape[0], 0 : blurred_image_array.shape[1], 0 : n_bands] = blurred_image_array
+        img_complete = np.zeros((y_size, image_array.shape[1], image_array.shape[2]))
+        blurred_complete = np.zeros((y_size, image_array.shape[1], image_array.shape[2]))
+        img_complete[0 : image_array.shape[0], 0 : image_array.shape[1], 0 : image_array.shape[2]] = image_array
+        blurred_complete[0 : blurred_image_array.shape[0], 0 : blurred_image_array.shape[1], 
+                         0 : image_array.shape[2]] = blurred_image_array
     elif mode == 1:
-        img_complete = np.zeros((image_array.shape[0], y_size, n_bands))
-        blurred_complete = np.zeros((image_array.shape[0], y_size, n_bands))
-        img_complete[0 : image_array.shape[0], 0 : image_array.shape[1], 0 : n_bands] = image_array
-        blurred_complete[0 : blurred_image_array.shape[0], 0 : blurred_image_array.shape[1], 0 : n_bands] = blurred_image_array
+        img_complete = np.zeros((image_array.shape[0], x_size, image_array.shape[2]))
+        blurred_complete = np.zeros((image_array.shape[0], x_size, image_array.shape[2]))
+        img_complete[0 : image_array.shape[0], 0 : image_array.shape[1], 0 : image_array.shape[2]] = image_array
+        blurred_complete[0 : blurred_image_array.shape[0], 0 : blurred_image_array.shape[1], 
+                         0 : image_array.shape[2]] = blurred_image_array
     elif mode == 2:
-        img_complete = np.zeros((x_size, y_size, n_bands))
-        blurred_complete = np.zeros((x_size, y_size, n_bands))
-        img_complete[0 : image_array.shape[0], 0 : image_array.shape[1], 0 : n_bands] = image_array
-        blurred_complete[0 : blurred_image_array.shape[0], 0 : blurred_image_array.shape[1], 0 : n_bands] = blurred_image_array
+        img_complete = np.zeros((y_size, x_size, image_array.shape[2]))
+        blurred_complete = np.zeros((y_size, x_size, image_array.shape[2]))
+        img_complete[0 : image_array.shape[0], 0 : image_array.shape[1], 0 : image_array.shape[2]] = image_array
+        blurred_complete[0 : blurred_image_array.shape[0], 0 : blurred_image_array.shape[1], 
+                         0 : image_array.shape[2]] = blurred_image_array
     elif mode == 3:
         img_complete = image_array
         blurred_complete = blurred_image_array
@@ -92,21 +93,22 @@ def image_clip_to_segment(image_array, blurred_image_array, image_height_size, i
     
     for i in range(0, image_array.shape[0], image_height_size):
         for j in range(0, image_array.shape[1], image_width_size):
-            img_orig = img_complete[i : i + image_height_size, j : j + image_width_size, 0 : n_bands]
+            img_orig = img_complete[i : i + image_height_size, j : j + image_width_size, 0 : image_array.shape[2]]
             if padding == 'original':
                 img_list.append(img_orig[start_index : (image_height_size - start_index), 
-                                         start_index : (image_width_size - start_index), 0 : n_bands])
+                                         start_index : (image_width_size - start_index), 0 : image_array.shape[2]])
             else:
                 img_list.append(img_orig)
-            blurred_list.append(blurred_complete[i : i + image_height_size, j : j + image_width_size, 0 : n_bands])
+            blurred_list.append(blurred_complete[i : i + image_height_size, j : j + image_width_size, 0 : image_array.shape[2]])
         
     reduction = f1 + f2 + f3 - 3
     
     if padding == 'original':
-        image_segment_array = np.zeros((len(img_list), image_height_size - reduction, image_width_size - reduction, n_bands))
+        image_segment_array = np.zeros((len(img_list), image_height_size - reduction, image_width_size - reduction, 
+                                        image_array.shape[2]))
     else:
-        image_segment_array = np.zeros((len(img_list), image_height_size, image_width_size, n_bands))
-    blurred_segment_array = np.zeros((len(blurred_list), image_height_size, image_width_size, n_bands))
+        image_segment_array = np.zeros((len(img_list), image_height_size, image_width_size, image_array.shape[2]))
+    blurred_segment_array = np.zeros((len(blurred_list), image_height_size, image_width_size, image_array.shape[2]))
 
     
     for index in range(len(img_list)):
@@ -158,20 +160,16 @@ def training_data_generation(DATA_DIR, img_height_size, img_width_size, f_1, f_2
     
         if (img.shape[0] % img_height_size != 0) and (img.shape[1] % img_width_size == 0):
             blurred_array, img_array = image_clip_to_segment(img, blurred_img, img_height_size, img_width_size, mode = 0, 
-                                                             n_bands = img.shape[2], f1 = f_1, f2 = f_2, f3 = f_3, 
-                                                             padding = pad)
+                                                             f1 = f_1, f2 = f_2, f3 = f_3, padding = pad)
         elif (img.shape[0] % img_height_size == 0) and (img.shape[1] % img_width_size != 0):
             blurred_array, img_array = image_clip_to_segment(img, blurred_img, img_height_size, img_width_size, mode = 1, 
-                                                             n_bands = img.shape[2], f1 = f_1, f2 = f_2, f3 = f_3, 
-                                                             padding = pad)
+                                                             f1 = f_1, f2 = f_2, f3 = f_3, padding = pad)
         elif (img.shape[0] % img_height_size != 0) and (img.shape[1] % img_width_size != 0):
             blurred_array, img_array = image_clip_to_segment(img, blurred_img, img_height_size, img_width_size, mode = 2, 
-                                                             n_bands = img.shape[2], f1 = f_1, f2 = f_2, f3 = f_3, 
-                                                             padding = pad)
+                                                             f1 = f_1, f2 = f_2, f3 = f_3, padding = pad)
         else:
             blurred_array, img_array = image_clip_to_segment(img, blurred_img, img_height_size, img_width_size, mode = 3, 
-                                                             n_bands = img.shape[2], f1 = f_1, f2 = f_2, f3 = f_3, 
-                                                             padding = pad)
+                                                             f1 = f_1, f2 = f_2, f3 = f_3, padding = pad)
         
         img_array_list.append(img_array)
         blurred_array_list.append(blurred_array)
@@ -224,8 +222,8 @@ def srcnn_model(image_height_size, image_width_size, n_bands, n1 = 64, n2 = 32, 
 
 
 
-def image_model_predict(input_image_filename, img_height_size, img_width_size, n_bands, factor, f1, f2, f3, fitted_model, 
-                        write, output_filename, pad):
+def image_model_predict(input_image_filename, img_height_size, img_width_size, factor, f1, f2, f3, fitted_model, write, 
+                        output_filename, pad):
     """ 
     This function cuts up an image into segments of fixed size, and feeds each segment to the model for upsampling. The 
     output upsampled segment is then allocated to its corresponding location in the image in order to obtain the complete upsampled 
@@ -235,7 +233,6 @@ def image_model_predict(input_image_filename, img_height_size, img_width_size, n
                             (default image format is .tif)
     - img_height_size: Height of image segment to be used for SRCNN model upsampling
     - img_width_size: Width of image segment to be used for SRCNN model upsampling
-    - n_bands: Number of channels present in the input image
     - factor: The upscaling factor by which the SRCNN model should be trained to upscale
     - f1: size of kernel to be used for the first convolutional layer
     - f2: size of kernel to be used for the second convolutional layer
@@ -254,18 +251,18 @@ def image_model_predict(input_image_filename, img_height_size, img_width_size, n
     img = np.transpose(gdal.Open(input_image_filename).ReadAsArray(), [1, 2, 0])
     img = cv2.resize(img, (img.shape[1] * factor, img.shape[0] * factor), interpolation = cv2.INTER_CUBIC)
     
-    x_size = ((img.shape[0] // img_height_size) + 1) * img_height_size
-    y_size = ((img.shape[1] // img_width_size) + 1) * img_width_size
+    y_size = ((img.shape[0] // img_height_size) + 1) * img_height_size
+    x_size = ((img.shape[1] // img_width_size) + 1) * img_width_size
     reduction = f1 + f2 + f3 - 3
     
     if (img.shape[0] % img_height_size != 0) and (img.shape[1] % img_width_size == 0):
-        img_complete = np.zeros((x_size, img.shape[1], img.shape[2]))
+        img_complete = np.zeros((y_size, img.shape[1], img.shape[2]))
         img_complete[0 : img.shape[0], 0 : img.shape[1], 0 : img.shape[2]] = img
     elif (img.shape[0] % img_height_size == 0) and (img.shape[1] % img_width_size != 0):
-        img_complete = np.zeros((img.shape[0], y_size, img.shape[2]))
+        img_complete = np.zeros((img.shape[0], x_size, img.shape[2]))
         img_complete[0 : img.shape[0], 0 : img.shape[1], 0 : img.shape[2]] = img
     elif (img.shape[0] % img_height_size != 0) and (img.shape[1] % img_width_size != 0):
-        img_complete = np.zeros((x_size, y_size, img.shape[2]))
+        img_complete = np.zeros((y_size, x_size, img.shape[2]))
         img_complete[0 : img.shape[0], 0 : img.shape[1], 0 : img.shape[2]] = img
     else:
          img_complete = img
@@ -313,16 +310,16 @@ def image_model_predict(input_image_filename, img_height_size, img_width_size, n
         output_dataset.SetProjection(input_dataset.GetProjection())
         if factor % 3 == 0:
             output_dataset.SetGeoTransform((input_dataset.GetGeoTransform()[0], 
-                                            float(math.ceil(input_dataset.GetGeoTransform()[1] * np.round((1 / factor), decimals = 1))), 
+                                            float(math.ceil(input_dataset.GetGeoTransform()[1] * np.round((1 / factor), decimals = 2))), 
                                             input_dataset.GetGeoTransform()[2], input_dataset.GetGeoTransform()[3], 
                                             input_dataset.GetGeoTransform()[4], 
-                                            float(- math.ceil(- input_dataset.GetGeoTransform()[5] * np.round((1 / factor), decimals = 1)))))
+                                            float(- math.ceil(- input_dataset.GetGeoTransform()[5] * np.round((1 / factor), decimals = 2)))))
         else:
             output_dataset.SetGeoTransform((input_dataset.GetGeoTransform()[0], 
-                                            input_dataset.GetGeoTransform()[1] * np.round((1 / factor), decimals = 1), 
+                                            input_dataset.GetGeoTransform()[1] * np.round((1 / factor), decimals = 2), 
                                             input_dataset.GetGeoTransform()[2], input_dataset.GetGeoTransform()[3], 
                                             input_dataset.GetGeoTransform()[4], 
-                                            input_dataset.GetGeoTransform()[5] * np.round((1 / factor), decimals = 1)))
+                                            input_dataset.GetGeoTransform()[5] * np.round((1 / factor), decimals = 2)))
         for i in range(1, 5):
             output_dataset.GetRasterBand(i).WriteArray(pred_img_actual[:, :, i - 1])    
         output_dataset.FlushCache()
